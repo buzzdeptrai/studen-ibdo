@@ -174,6 +174,7 @@ tr:hover td{background:#f8f9ff}
       <div class="tab active" data-tab="raw" onclick="switchTab('raw')">Raw Data</div>
       <div class="tab" data-tab="enrolment" onclick="switchTab('enrolment')">Auto Enrolment</div>
       <div class="tab" data-tab="arrival" onclick="switchTab('arrival')">Arrival List</div>
+      <div class="tab" data-tab="json" onclick="switchTab('json')">Raw JSON</div>
     </div>
 
     <div class="btn-group" style="margin-bottom:12px">
@@ -408,8 +409,17 @@ function toArrival(r) {
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
+  if (tab === "json") { renderJson(); return; }
   const data = tab === "raw" ? rawData : tab === "enrolment" ? enrolmentData : arrivalData;
   renderTable(data, tab);
+}
+
+function renderJson() {
+  const wrap = document.getElementById("tableWrap");
+  if (!rawData.length) { wrap.innerHTML = "<p style='padding:20px;color:#999'>No data</p>"; return; }
+  const esc = JSON.stringify(rawData, null, 2)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  wrap.innerHTML = `<pre style="margin:0;padding:16px;white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.5;font-family:monospace">${esc}</pre>`;
 }
 
 function renderTable(data, tab) {
@@ -445,7 +455,7 @@ function renderTable(data, tab) {
 }
 
 function getActiveData() {
-  if (currentTab === "raw") return { data: rawData, name: "reservations_raw" };
+  if (currentTab === "raw" || currentTab === "json") return { data: rawData, name: "reservations_raw" };
   if (currentTab === "enrolment") return { data: enrolmentData, name: "auto_enrolment" };
   return { data: arrivalData, name: "arrival_list" };
 }
@@ -453,7 +463,7 @@ function getActiveData() {
 function exportCSV() {
   const { data, name } = getActiveData();
   if (!data.length) return;
-  const keys = currentTab === "raw"
+  const keys = (currentTab === "raw" || currentTab === "json")
     ? ["reservationID","reservationConfirmationNo","reservationStatus","reservationBookingName",
        "reservationArrivalDate","reservationDepartureDate","reservationSource","reservationSegment",
        "reservationNoOfRoom","reservationNoOfAdult","reservationIsGroup"]
