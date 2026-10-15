@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDB Reservation Exporter</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a237e,#283593);color:#fff;padding:20px 30px;display:flex;align-items:center;gap:15px}
+.header h1{font-size:20px;font-weight:600}
+.header small{opacity:.7;font-size:13px}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
+.card h2{font-size:16px;margin-bottom:16px;color:#1a237e;border-bottom:2px solid #e8eaf6;padding-bottom:8px}
+.form-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.form-group{flex:1;min-width:180px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.form-group input,.form-group select{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#3f51b5;box-shadow:0 0 0 3px rgba(63,81,181,.1)}
+.btn{padding:10px 24px;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
+.btn-primary{background:#1a237e;color:#fff}.btn-primary:hover{background:#283593}
+.btn-success{background:#2e7d32;color:#fff}.btn-success:hover{background:#388e3c}
+.btn-warning{background:#f57f17;color:#fff}.btn-warning:hover{background:#f9a825}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.status-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:6px;font-size:13px;margin-bottom:16px}
+.status-bar.info{background:#e3f2fd;color:#1565c0}
+.status-bar.success{background:#e8f5e9;color:#2e7d32}
+.status-bar.error{background:#ffebee;color:#c62828}
+.status-bar.loading{background:#fff3e0;color:#e65100}
+.spinner{width:16px;height:16px;border:2px solid #ccc;border-top-color:#1a237e;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.stat-box{background:#f5f5f5;border-radius:8px;padding:12px 16px;text-align:center;min-width:100px}
+.stat-box .num{font-size:24px;font-weight:700;color:#1a237e}
+.stat-box .label{font-size:11px;color:#888;text-transform:uppercase}
+.tabs{display:flex;gap:0;border-bottom:2px solid #e0e0e0;margin-bottom:16px}
+.tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:600;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab.active{color:#1a237e;border-bottom-color:#1a237e}
+.tab:hover{color:#333}
+.table-wrap{overflow-x:auto;max-height:500px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#f5f5f5;position:sticky;top:0;padding:10px 12px;text-align:left;font-weight:600;color:#555;border-bottom:2px solid #e0e0e0;white-space:nowrap;z-index:1}
+td{padding:8px 12px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
+tr:hover td{background:#f8f9ff}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-B{background:#e3f2fd;color:#1565c0}
+.badge-IC{background:#e8f5e9;color:#2e7d32}
+.badge-IP{background:#fff3e0;color:#e65100}
+.badge-OP{background:#f3e5f5;color:#7b1fa2}
+.badge-C{background:#e0e0e0;color:#424242}
+.badge-N{background:#ffcdd2;color:#b71c1c}
+.badge-NS{background:#fce4ec;color:#c62828}
+.hidden{display:none}
+.token-group{position:relative}
+.token-toggle{position:absolute;right:10px;top:28px;cursor:pointer;font-size:18px;color:#999}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>IDB Reservation Exporter</h1>
+    <small>Fetch &rarr; Preview &rarr; Export (Enrolment / Arrival List)</small>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Config -->
+  <div class="card">
+    <h2>API Configuration</h2>
+    <div class="form-row">
+      <div class="form-group" style="flex:3">
+        <label>Bearer Token</label>
+        <div class="token-group">
+          <input type="password" id="token" placeholder="Paste your bearer token here...">
+          <span class="token-toggle" onclick="toggleToken()">&#128065;</span>
+        </div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Arrival From</label>
+        <input type="date" id="arrFrom" value="2026-01-01">
+      </div>
+      <div class="form-group">
+        <label>Arrival To</label>
+        <input type="date" id="arrTo" value="2026-06-01">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="status" multiple size="7">
+          <option value="B" selected>B - Booking</option>
+          <option value="IP" selected>IP - In House Pending</option>
+          <option value="IC" selected>IC - In House Complete</option>
+          <option value="OP" selected>OP - Check Out Pending</option>
+          <option value="C" selected>C - Checked Out (All)</option>
+          <option value="N">N - Booking Cancel</option>
+          <option value="NS">NS - No Show</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Page Size</label>
+        <input type="number" id="pageSize" value="50" min="1" max="200">
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="btnFetch" onclick="fetchData()">Fetch Reservations</button>
+      <button class="btn btn-warning btn-sm" onclick="clearAll()">Clear Data</button>
+    </div>
+  </div>
+
+  <!-- MySQL Config -->
+  <div class="card">
+    <h2>MySQL Database (ohip_res)</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Host</label>
+        <input type="text" id="dbHost" placeholder="superghs.com" value="14.225.211.84">
+      </div>
+      <div class="form-group" style="max-width:100px">
+        <label>Port</label>
+        <input type="number" id="dbPort" value="3306">
+      </div>
+      <div class="form-group">
+        <label>User</label>
+        <input type="text" id="dbUser" placeholder="username" value="laravel_app_hyte">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="dbPass" placeholder="password" value="uitT@990912">
+      </div>
+      <div class="form-group">
+        <label>Database</label>
+        <input type="text" id="dbName" placeholder="ghstest_lms" value="laravel_db_app">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="max-width:150px">
+        <label>Hotel ID</label>
+        <input type="number" id="hotelId" placeholder="1" value="">
+      </div>
+      <div class="form-group" style="max-width:200px">
+        <label>Property Code</label>
+        <input type="text" id="propertyCode" placeholder="HOTEL01" value="">
+      </div>
+      <div class="form-group" style="max-width:200px">
+        <label>Import Mode</label>
+        <select id="importMode">
+          <option value="skip_existing" selected>Skip existing (by reservation_id)</option>
+          <option value="insert_all">Insert all (may duplicate)</option>
+          <option value="upsert">Upsert (update if exists)</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary btn-sm" onclick="testDb()">Test Connection</button>
+      <button class="btn btn-success" id="btnImport" onclick="importToDb()" disabled>Import to MySQL</button>
+    </div>
+    <div id="dbStatus" class="hidden" style="margin-top:12px"></div>
+  </div>
+
+  <!-- Status -->
+  <div id="statusBar" class="hidden"></div>
+
+  <!-- Results -->
+  <div id="resultsCard" class="card hidden">
+    <h2>Results</h2>
+    <div class="stats" id="stats"></div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="raw" onclick="switchTab('raw')">Raw Data</div>
+      <div class="tab" data-tab="enrolment" onclick="switchTab('enrolment')">Auto Enrolment</div>
+      <div class="tab" data-tab="arrival" onclick="switchTab('arrival')">Arrival List</div>
+    </div>
+
+    <div class="btn-group" style="margin-bottom:12px">
+      <button class="btn btn-success btn-sm" onclick="exportCSV()">Export CSV</button>
+      <button class="btn btn-success btn-sm" onclick="exportJSON()">Export JSON</button>
+    </div>
+
+    <div class="table-wrap" id="tableWrap"></div>
+  </div>
+</div>
+
+<script>
+let rawData = [];
+let enrolmentData = [];
+let arrivalData = [];
+let currentTab = "raw";
+
+function toggleToken() {
+  const el = document.getElementById("token");
+  el.type = el.type === "password" ? "text" : "password";
+}
+
+function setStatus(type, msg) {
+  const el = document.getElementById("statusBar");
+  el.className = `status-bar ${type}`;
+  el.innerHTML = (type === "loading" ? '<span class="spinner"></span>' : "") + msg;
+  el.classList.remove("hidden");
+}
+
+function fmtDate(d) {
+  // date input yyyy-mm-dd → dd/mm/yyyy
+  if (!d) return "";
+  const p = d.split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+}
+
+function parseDate(d) {
+  if (!d) return "";
+  const p = d.trim().split(" ")[0].split("/");
+  return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d;
+}
+
+function extractEmail(g) {
+  if (g.guestEmail && g.guestEmail.trim()) return g.guestEmail.trim();
+  if (g.guestAddress && /^[^@]+@[^@]+\.[^@]+$/.test(g.guestAddress.trim())) return g.guestAddress.trim();
+  return "";
+}
+
+async function fetchData() {
+  const token = document.getElementById("token").value.trim();
+  if (!token) { setStatus("error", "Bearer Token is required!"); return; }
+
+  const arrFrom = fmtDate(document.getElementById("arrFrom").value);
+  const arrTo = fmtDate(document.getElementById("arrTo").value);
+  const statusEl = document.getElementById("status");
+  const statuses = Array.from(statusEl.selectedOptions).map(o => o.value).join(",");
+  const pageSize = parseInt(document.getElementById("pageSize").value) || 50;
+
+  if (!arrFrom || !arrTo) { setStatus("error", "Please select date range"); return; }
+
+  document.getElementById("btnFetch").disabled = true;
+  setStatus("loading", `Fetching page 1...`);
+
+  rawData = [];
+  let page = 1;
+
+  try {
+    while (true) {
+      const url = `/api/reservations?arrivalFrom=${arrFrom}&arrivalTo=${arrTo}&reservationStatus=${encodeURIComponent(statuses)}&pageNo=${page}&size=${pageSize}`;
+      setStatus("loading", `Fetching page ${page}... (${rawData.length} records so far)`);
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+      }
+
+      const data = await res.json();
+      console.log("API response keys:", Object.keys(data), "type:", typeof data, "isArray:", Array.isArray(data));
+
+      // Extract records - unwrap response
+      // API returns: [{ res_msg: [...], totalPage, currentPageNo }]
+      let root = data;
+      if (Array.isArray(root) && root.length === 1 && root[0].res_msg) {
+        root = root[0];
+      }
+      let list = [];
+      let totalPage = 0;
+      if (Array.isArray(root) && root.length && root[0].reservationID) {
+        list = root;
+      } else if (root.res_msg && Array.isArray(root.res_msg)) {
+        list = root.res_msg;
+        totalPage = root.totalPage || 0;
+      } else if (root.data && Array.isArray(root.data)) {
+        list = root.data;
+      } else {
+        console.log("Unknown format:", JSON.stringify(root).slice(0, 300));
+      }
+
+      console.log(`Page ${page}: ${list.length} records, totalPage: ${totalPage}`);
+
+      if (!list.length) {
+        if (page === 1) {
+          setStatus("error", "No records found. Check date range and status. (See console F12 for details)");
+          document.getElementById("btnFetch").disabled = false;
+          return;
+        }
+        break;
+      }
+
+      rawData.push(...list);
+      if (list.length < pageSize || (totalPage && page >= totalPage)) break;
+      page++;
+    }
+
+    // Convert
+    enrolmentData = rawData.flatMap(toEnrolment);
+    arrivalData = rawData.flatMap(toArrival).sort((a, b) => (a.ARRIVAL_DATE || "").localeCompare(b.ARRIVAL_DATE || ""));
+
+    // Stats
+    const st = {};
+    rawData.forEach(r => { const s = r.reservationStatus; st[s] = (st[s] || 0) + 1; });
+    document.getElementById("stats").innerHTML =
+      `<div class="stat-box"><div class="num">${rawData.length}</div><div class="label">Total</div></div>` +
+      Object.entries(st).map(([k, v]) => `<div class="stat-box"><div class="num">${v}</div><div class="label"><span class="badge badge-${k}">${k}</span></div></div>`).join("");
+
+    document.getElementById("resultsCard").classList.remove("hidden");
+    switchTab(currentTab);
+    setStatus("success", `Fetched ${rawData.length} reservations (${page} page${page > 1 ? "s" : ""})`);
+  } catch (e) {
+    setStatus("error", `Error: ${e.message}`);
+  }
+  document.getElementById("btnFetch").disabled = false;
+}
+
+function toEnrolment(r) {
+  // 1 row per roomingList entry (per room/guest)
+  return (r.reservationRoomingList || []).map(rl => {
+    const g = (rl.roomingListGuest || [])[0] || {};
+    const rt = (rl.roomingListRoomType || [{}])[0] || {};
+    const rate = (rl.roomingListRate || [{}])[0] || {};
+    const room = rl.roomingListRoom || {};
+    const rateWithTax = (rate.rateAmount || 0) + (rate.rateTax1Amount || 0) + (rate.rateTax2Amount || 0) + (rate.rateTax3Amount || 0);
+    const isEmailInAddr = /^[^@]+@[^@]+\.[^@]+$/.test(g.guestAddress || "");
+    return {
+      PROFILE_NO: g.guestID || "",
+      CONF_NO: r.reservationConfirmationNo || "",
+      ARRIVAL_DATE: parseDate(rl.roomingListArrivalDate),
+      DEPARTURE_DATE: parseDate(rl.roomingListDepartureDate),
+      BOOKING_DATE: parseDate(r.reservationBookingDate),
+      GUEST_NAME: `${g.guestName || ""} ${g.guestLastName || ""}`.trim(),
+      MEMBERSHIP_NO: "",
+      TOTAL_REVENUE: "",
+      ROOM_REVENUE: "",
+      FB_REVENUE: "",
+      OTHER_REVENUE: "",
+      RATES: rate.rateAmount || 0,
+      total_rate: rateWithTax,
+      REWARD_TYPE: "",
+      PROPERTY_CODE: "",
+      MARKET_CODE: r.reservationSegment || "",
+      RATE_CODE: rate.rateCode || "",
+      SOURCE_NAME: r.reservationSource || "",
+      ROOM_NO: room.roomNo || "",
+      ROOM_TYPE_RESERV: rt.roomTypeCode || "",
+      EMAIL: isEmailInAddr ? g.guestAddress.trim() : extractEmail(g),
+      DESCRIPTION: rt.roomTypeDescription || "",
+      title: g.guestSalutation || "",
+      FIRSTNAME: (g.guestName || "").trim(),
+      LASTNAME: (g.guestLastName || "").trim(),
+      STATUS: r.reservationStatus || "",
+      birthday: parseDate(g.guestBirthdate),
+      MOBILE: g.guestMobileNo || r.reservationContactNo1 || "",
+      NATIONALITY: g.guestNationality || "",
+      GENDER: g.guestSex || "",
+      ADDRESS: isEmailInAddr ? "" : (g.guestAddress || ""),
+      COUNTRY: r.reservationContactCountry || g.guestCountry || "",
+    };
+  });
+}
+
+function toArrival(r) {
+  return (r.reservationRoomingList || []).map(rl0 => {
+    const guest = (rl0.roomingListGuest || [])[0] || r.reservationBooker || {};
+    const rt = (rl0.roomingListRoomType || [{}])[0] || {};
+    const rate = (rl0.roomingListRate || [{}])[0] || {};
+    const room = rl0.roomingListRoom || {};
+    const isEmailInAddr = /^[^@]+@[^@]+\.[^@]+$/.test(guest.guestAddress || "");
+    let nights = 0;
+    try {
+      const [d1,m1,y1] = rl0.roomingListArrivalDate.split("/");
+      const [d2,m2,y2] = rl0.roomingListDepartureDate.split("/");
+      nights = Math.round((new Date(y2,m2-1,d2) - new Date(y1,m1-1,d1)) / 86400000);
+    } catch {}
+    return {
+      CONF_NO: r.reservationConfirmationNo || "",
+      STATUS: r.reservationStatus || "",
+      GUEST_NAME: `${guest.guestName || ""} ${guest.guestLastName || ""}`.trim(),
+      title: guest.guestSalutation || "",
+      FIRSTNAME: (guest.guestName || "").trim(),
+      LASTNAME: (guest.guestLastName || "").trim(),
+      NATIONALITY: guest.guestNationality || "",
+      VIP: guest.guestIsVIP || "",
+      VIP_TYPE: guest.guestVIPType || "",
+      MOBILE: guest.guestMobileNo || r.reservationContactNo1 || "",
+      EMAIL: isEmailInAddr ? guest.guestAddress.trim() : extractEmail(guest),
+      ARRIVAL_DATE: parseDate(rl0.roomingListArrivalDate),
+      DEPARTURE_DATE: parseDate(rl0.roomingListDepartureDate),
+      ETA: rl0.roomingListETA || "",
+      NIGHTS: nights,
+      ROOM_NO: room.roomNo || "",
+      ROOM_TYPE: rt.roomTypeCode || "",
+      ROOM_TYPE_DESC: rt.roomTypeDescription || "",
+      ADULTS: rl0.roomingListNoOfAdult || 0,
+      CHILDREN: rl0.roomingListNoOfChild || 0,
+      RATE_CODE: rate.rateCode || "",
+      RATE_AMOUNT: rate.rateAmount || 0,
+      TOTAL_RATE: rl0.roomingListTotalRoomRate || 0,
+      SOURCE: r.reservationSource || "",
+      SEGMENT: r.reservationSegment || "",
+      GROUP_NAME: r.reservationGroupName || "",
+      IS_GROUP: r.reservationIsGroup || "",
+      GENDER: guest.guestSex || "",
+      COUNTRY: r.reservationContactCountry || guest.guestCountry || "",
+    };
+  });
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
+  const data = tab === "raw" ? rawData : tab === "enrolment" ? enrolmentData : arrivalData;
+  renderTable(data, tab);
+}
+
+function renderTable(data, tab) {
+  const wrap = document.getElementById("tableWrap");
+  if (!data.length) { wrap.innerHTML = "<p style='padding:20px;color:#999'>No data</p>"; return; }
+
+  // For raw, show flat summary
+  let rows = data;
+  let cols;
+  if (tab === "raw") {
+    cols = ["reservationID","reservationConfirmationNo","reservationStatus","reservationBookingName",
+            "reservationArrivalDate","reservationDepartureDate","reservationSource","reservationSegment",
+            "reservationNoOfRoom","reservationNoOfAdult","reservationIsGroup"];
+    rows = data.map(r => {
+      const obj = {};
+      cols.forEach(c => obj[c] = r[c] ?? "");
+      return obj;
+    });
+  } else {
+    cols = Object.keys(rows[0]);
+  }
+
+  let html = "<table><thead><tr>" + cols.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>";
+  rows.forEach(r => {
+    html += "<tr>" + cols.map(c => {
+      let v = r[c] ?? "";
+      if (c === "reservationStatus" || c === "STATUS") v = `<span class="badge badge-${v}">${v}</span>`;
+      return `<td>${v}</td>`;
+    }).join("") + "</tr>";
+  });
+  html += "</tbody></table>";
+  wrap.innerHTML = html;
+}
+
+function getActiveData() {
+  if (currentTab === "raw") return { data: rawData, name: "reservations_raw" };
+  if (currentTab === "enrolment") return { data: enrolmentData, name: "auto_enrolment" };
+  return { data: arrivalData, name: "arrival_list" };
+}
+
+function exportCSV() {
+  const { data, name } = getActiveData();
+  if (!data.length) return;
+  const keys = currentTab === "raw"
+    ? ["reservationID","reservationConfirmationNo","reservationStatus","reservationBookingName",
+       "reservationArrivalDate","reservationDepartureDate","reservationSource","reservationSegment",
+       "reservationNoOfRoom","reservationNoOfAdult","reservationIsGroup"]
+    : Object.keys(data[0]);
+  const esc = v => { const s = String(v??""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g,'""')}"` : s; };
+  const csv = [keys.join(","), ...data.map(r => keys.map(k => esc(r[k])).join(","))].join("\n");
+  download(csv, `${name}.csv`, "text/csv");
+}
+
+function exportJSON() {
+  const { data, name } = getActiveData();
+  if (!data.length) return;
+  download(JSON.stringify(data, null, 2), `${name}.json`, "application/json");
+}
+
+function download(content, filename, type) {
+  const blob = new Blob([content], { type: type + ";charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function clearAll() {
+  rawData = []; enrolmentData = []; arrivalData = [];
+  document.getElementById("resultsCard").classList.add("hidden");
+  document.getElementById("statusBar").classList.add("hidden");
+  document.getElementById("stats").innerHTML = "";
+  document.getElementById("tableWrap").innerHTML = "";
+}
+
+// --- MySQL ---
+function getDbConfig() {
+  return {
+    host: document.getElementById("dbHost").value.trim(),
+    port: parseInt(document.getElementById("dbPort").value) || 3306,
+    user: document.getElementById("dbUser").value.trim(),
+    password: document.getElementById("dbPass").value,
+    database: document.getElementById("dbName").value.trim(),
+  };
+}
+
+function setDbStatus(type, msg) {
+  const el = document.getElementById("dbStatus");
+  el.className = `status-bar ${type}`;
+  el.innerHTML = (type === "loading" ? '<span class="spinner"></span>' : "") + msg;
+  el.classList.remove("hidden");
+}
+
+async function testDb() {
+  const cfg = getDbConfig();
+  if (!cfg.host || !cfg.user || !cfg.database) { setDbStatus("error", "Fill in host, user, database"); return; }
+  setDbStatus("loading", "Testing connection...");
+  try {
+    const res = await fetch("/db/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    });
+    const r = await res.json();
+    if (r.success) {
+      setDbStatus("success", "Connected to MySQL!");
+      document.getElementById("btnImport").disabled = false;
+    } else {
+      setDbStatus("error", "Failed: " + r.message);
+    }
+  } catch (e) {
+    setDbStatus("error", "Error: " + e.message);
+  }
+}
+
+async function importToDb() {
+  if (!rawData.length) { setDbStatus("error", "No data to import. Fetch reservations first."); return; }
+  const cfg = getDbConfig();
+  const hotelId = parseInt(document.getElementById("hotelId").value) || null;
+  const propertyCode = document.getElementById("propertyCode").value.trim() || null;
+  const mode = document.getElementById("importMode").value;
+
+  if (!confirm(`Import ${rawData.length} reservations to ohip_res?\n\nMode: ${mode}\nHost: ${cfg.host}\nDB: ${cfg.database}`)) return;
+
+  setDbStatus("loading", `Importing ${rawData.length} records...`);
+  document.getElementById("btnImport").disabled = true;
+
+  try {
+    const res = await fetch("/db/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dbConfig: cfg, reservations: rawData, hotelId, propertyCode, mode }),
+    });
+    const r = await res.json();
+    if (r.success) {
+      let msg = `Imported! Total: ${r.total}`;
+      if (r.inserted) msg += `, Inserted: ${r.inserted}`;
+      if (r.skipped) msg += `, Skipped: ${r.skipped}`;
+      if (r.updated) msg += `, Updated: ${r.updated}`;
+      setDbStatus("success", msg);
+    } else {
+      setDbStatus("error", "Import failed: " + r.message);
+    }
+  } catch (e) {
+    setDbStatus("error", "Error: " + e.message);
+  }
+  document.getElementById("btnImport").disabled = false;
+}
+</script>
+</body>
+</html>

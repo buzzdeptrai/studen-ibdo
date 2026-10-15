@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+**/.DS_Store
+
+# Exported data (contains real guest/reservation data)
+exports/
+
+# Environment / secrets
+.env
+*.token
+token.txt
+
+# Logs
+*.log
+
+# Claude cache
+.claude/tsc-cache/
