@@ -49,6 +49,20 @@ function parseDate(d) {
   return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : d;
 }
 
+function roomNights(arr, dep) {
+  const a = parseDate(arr), b = parseDate(dep);
+  if (!a || !b) return 1;
+  const n = Math.round((new Date(b) - new Date(a)) / 86400000);
+  return n > 0 ? n : 1;
+}
+
+// Revenue component -> gross (incl tax). IDB returns { net, tax } or total { net, tax, gross }
+function revGross(x) {
+  if (!x || typeof x !== "object") return 0;
+  if (x.gross != null) return Number(x.gross) || 0;
+  return (Number(x.net) || 0) + (Number(x.tax) || 0);
+}
+
 function extractEmail(g) {
   if (g.guestEmail && g.guestEmail.trim()) return g.guestEmail.trim();
   if (g.guestAddress && /^[^@]+@[^@]+\.[^@]+$/.test(g.guestAddress.trim())) return g.guestAddress.trim();
@@ -68,6 +82,19 @@ function mapToOhipRows(r, hotelId, propertyCode) {
     const rateWithTax = (rate.rateAmount || 0) + (rate.rateTax1Amount || 0) + (rate.rateTax2Amount || 0) + (rate.rateTax3Amount || 0);
     const isEmail = /^[^@]+@[^@]+\.[^@]+$/.test(g.guestAddress || "");
 
+    // --- Revenue (incl tax = net + tax). Primary: roomingListRevenue; fallback: rate-based whole stay ---
+    const rev = rl.roomingListRevenue || {};
+    const hasRev = rev.roomRevenue != null || rev.fnbRevenue != null || rev.otherRevenue != null;
+    const roomRev = hasRev ? revGross(rev.roomRevenue) : rateWithTax * roomNights(rl.roomingListArrivalDate, rl.roomingListDepartureDate);
+    const fnbRev = revGross(rev.fnbRevenue);
+    const otherRev = revGross(rev.otherRevenue);
+    // manual_total = sum of ALL revenue components except `total` (incl statutory, ioRevenue, nonHotelRevenue)
+    const manualTotal = hasRev
+      ? Object.keys(rev).filter((k) => k !== "total").reduce((s, k) => s + revGross(rev[k]), 0)
+      : roomRev + fnbRev + otherRev;
+    const apiTotal = rev.total != null ? revGross(rev.total) : NaN;
+    const ttlRev = (!isNaN(apiTotal) && apiTotal >= manualTotal) ? apiTotal : manualTotal;
+
     return {
       hotel_id: hotelId || null,
       reservation_id: r.reservationID || null,
@@ -79,10 +106,10 @@ function mapToOhipRows(r, hotelId, propertyCode) {
       reservation_date: parseDate(r.reservationBookingDate),
       guest_name: `${g.guestName || ""} ${g.guestLastName || ""}`.trim() || null,
       membership_no: null,
-      ttl_rev: null,
-      rm_rev: null,
-      fb_rev: null,
-      other_rev: null,
+      ttl_rev: ttlRev,
+      rm_rev: roomRev,
+      fb_rev: fnbRev,
+      other_rev: otherRev,
       rm_rate: rate.rateAmount || null,
       total_rate: rateWithTax || null,
       point_type: null,

@@ -57,7 +57,7 @@ Guest info comes from `reservationRoomingList[].roomingListGuest[0]` — the act
 | file_process | "IDB_API" (hardcoded) |
 
 ### Fields intentionally left NULL (no source in API)
-ttl_rev, rm_rev, fb_rev, other_rev, point_type, membership_no, membership_no_original, property_code, hotel_id, flag_revenue, time_revenue, state, lang, cardname, passport, idcard, minus_marked
+point_type, membership_no, membership_no_original, property_code, hotel_id, flag_revenue, time_revenue, state, lang, cardname, passport, idcard, minus_marked
 
 ### Fields available in API but NOT mapped to ohip_res (no column)
 - rateCode (e.g. "BST-RM")
@@ -69,8 +69,44 @@ ttl_rev, rm_rev, fb_rev, other_rev, point_type, membership_no, membership_no_ori
 - reservationArrivalTime / DepartureTime
 - roomingListRoom.roomFloor, roomCategory, roomStatus, roomHousekeepingStatus
 
+## ⚠️ Revenue Mapping (QUAN TRỌNG — có thể đổi logic/flow sau)
+
+> Logic tính revenue này **dễ thay đổi** theo yêu cầu CRM (points, arrival list, auto register). Khi sửa phải cập nhật ĐỒNG BỘ ở cả `server.js` (`mapToOhipRows`) và `import-db.js`.
+
+### Nguồn: `reservationRoomingList[].roomingListRevenue` (API format MỚI, cập nhật 2026-10)
+Mỗi khoản revenue là **object `{ net, tax }`**; riêng `total` có thêm `gross`:
+```json
+"roomingListRevenue": {
+  "roomRevenue":    { "net": 87.72, "tax": 12.28 },
+  "fnbRevenue":     { "net": 0, "tax": 0 },
+  "otherRevenue":   { "net": 0, "tax": 0 },
+  "statutory":      { "net": 0, "tax": 0 },
+  "ioRevenue":      { "net": 0, "tax": 0 },
+  "nonHotelRevenue":{ "net": 0, "tax": 0 },
+  "total":          { "net": 87.72, "tax": 12.28, "gross": 100 }
+}
+```
+
+### Quy tắc (CHỐT 2026-10-16) — dùng **incl tax** (gross = net + tax)
+| ohip_res | Công thức |
+|---|---|
+| `rm_rev` | `roomRevenue` gross (net+tax) |
+| `fb_rev` | `fnbRevenue` gross (default 0) |
+| `other_rev` | `otherRevenue` gross (default 0) |
+| `ttl_rev` | `total.gross` nếu có & ≥ `manual_total`, ngược lại = `manual_total` |
+
+- **`manual_total` = Σ gross của MỌI khoản ≠ `total`** (gồm cả `statutory`, `ioRevenue`, `nonHotelRevenue` — những khoản KHÔNG có cột riêng). KHÔNG phải chỉ `rm_rev+fb_rev+other_rev`.
+- Helper `revGross(x)`: có `.gross` → dùng gross; ngược lại `net + tax`.
+- **Fallback** (API cũ chưa có `roomingListRevenue`): `rm_rev = (rateAmount + tax1+2+3) × số đêm`; `ttl_rev = rm_rev`.
+
+### Lưu ý
+- `fb_rev`/`other_rev` để `0` (không NULL) để service CRM cộng points không lỗi.
+- `total.gross` = tổng TẤT CẢ khoản → `ttl_rev` luôn ≥ tổng 3 cột rm/fb/other.
+- File sample `exports/reservations_raw.json` bản cũ (Sep 7) CHƯA có revenue → muốn test đường chính phải fetch data mới.
+
 ## Decisions Made
 - **1 row per room** (DECIDED 2026-09-10): Each roomingList entry = 1 row in ohip_res. Skip check uses `reservation_id + rooming_list_id`. Added `rooming_list_id` column to ohip_res. 50 reservations → 144 rows.
+- **Revenue incl tax** (DECIDED 2026-10-16): xem section "Revenue Mapping" ở trên.
 
 ## Data Structure
 - **1 reservation → nhiều dòng** (1 dòng per roomingList entry/room)
