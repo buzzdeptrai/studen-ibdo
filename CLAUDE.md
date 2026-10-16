@@ -52,7 +52,7 @@ Guest info comes from `reservationRoomingList[].roomingListGuest[0]` — the act
 | source_name | reservationSource |
 | room_no | roomingListRoom.roomNo (only when assigned/checked-in) |
 | room_type | roomingListRoomType[0].roomTypeCode |
-| booking_status | reservationStatus (B/IC/IP/OP) |
+| booking_status | roomingListStatus (per-room; fallback reservationStatus) |
 | remark | reservationRemarks |
 | file_process | "IDB_API" (hardcoded) |
 
@@ -107,6 +107,7 @@ Mỗi khoản revenue là **object `{ net, tax }`**; riêng `total` có thêm `g
 ## Decisions Made
 - **1 row per room** (DECIDED 2026-09-10): Each roomingList entry = 1 row in ohip_res. Skip check uses `reservation_id + rooming_list_id`. Added `rooming_list_id` column to ohip_res. 50 reservations → 144 rows.
 - **Revenue incl tax** (DECIDED 2026-10-16): xem section "Revenue Mapping" ở trên.
+- **booking_status theo cấp phòng** (DECIDED 2026-10-16): dùng `roomingListStatus` (per-room), fallback `reservationStatus`. Vì reservation=B/IC nhưng phòng có thể =N (huỷ) hoặc =C (đã check-out). Rate ≠ Revenue: `rm_rate`/`total_rate` = rate plan (giá/đêm incl tax, để NULL khi rateAmount=0, KHÔNG backfill từ revenue); tiền thực nằm ở `rm_rev`/`ttl_rev`.
 
 ## Data Structure
 - **1 reservation → nhiều dòng** (1 dòng per roomingList entry/room)

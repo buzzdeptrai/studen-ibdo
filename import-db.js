@@ -115,7 +115,7 @@ async function main() {
         title: g.guestSalutation || null,
         firstname: (g.guestName || "").trim() || null,
         lastname: (g.guestLastName || "").trim() || null,
-        booking_status: r.reservationStatus || null,
+        booking_status: rl.roomingListStatus || r.reservationStatus || null,
         membership_no_original: null,
         file_process: "IDB_API",
         process_date: today,
